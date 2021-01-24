@@ -1,0 +1,1224 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Lode Runner par Marc-Antoine Lussier, Stéphanie Figuereido et Olivier Brodeur</title>
+	<link rel="stylesheet" type="text/css" href="" />
+    <script type="text/javascript">
+	var objCanvas = null;
+	var objC2D = null;
+	var objCycleAnimation = null;
+	
+	var intNbCasesX = 28;
+	var intNbCasesY = 17;
+	var intTailleCase = 32;
+	
+	var objImages = new Images();
+	var objSons = new Sons();
+	var objJeu = new Jeu();
+	var objNiveau = null;
+	var tabObjPasserelles = null;
+	var tabObjEchelles = null;
+	var tabObjBarres = null;
+	var tabObjLingots = null;
+	var tabObjGardes = null;
+	var objLodeRunner = null;
+
+
+	
+	function Images() {
+		var objImage = new Image();
+		objImage.src = 'stone-wall-dark_half-256x256.gif';
+		this.brique = objImage;
+		
+		objImage = new Image();
+		objImage.src = 'es3o1g.png';
+		this.barreauEchelle = objImage;
+		
+		objImage = new Image();
+		objImage.src = 'Barre.png';
+		this.barreauBarre = objImage;
+		
+		objImage = new Image();
+		objImage.src = 'or.png';
+		this.lingot = objImage;
+
+		// images pour Lode Runner
+		
+		objImage = new Image();
+		objImage.src = 'chute.png';
+		this.joueurChute = objImage;
+		
+		this.tabImagesLodeRunnerCreuse = [];
+		for ( var i = 1; i <= 3; i++) {
+			objImage = new Image();
+			objImage.src = 'creuser' + i + '.png';
+			this.tabImagesLodeRunnerCreuse.push(objImage);
+		}
+		
+		
+		this.tabImagesLodeRunnerPasserelle = [];
+		
+		for ( i = 1; i <= 4; i++) {
+			objImage = new Image();
+			objImage.src = 'marcher' + i + '.png';
+			this.tabImagesLodeRunnerPasserelle.push(objImage);
+		}
+		
+		this.tabImagesLodeRunnerBarre = [];
+		
+		for (i = 1; i <= 4; i++) {
+			objImage = new Image();
+			objImage.src = 'barre' + i + '.png';
+			this.tabImagesLodeRunnerBarre.push(objImage);
+		}
+		
+		this.tabImagesLodeRunnerEchelle = [];
+		
+		for (i = 1; i <= 4; i++) {
+			objImage = new Image();
+			objImage.src = 'echelle' + i + '.png';
+			this.tabImagesLodeRunnerEchelle.push(objImage);
+		}
+		
+		// images pour les gardes
+		this.tabImagesGardePasserelle = [];
+		
+		for (i = 1; i <= 4; i++) {
+			objImage = new Image();
+			objImage.src = 'ennemiMarche' + i + '.png';
+			this.tabImagesGardePasserelle.push(objImage);
+		}
+		
+		this.tabImagesGardeBarre = [];
+		this.tabImagesGardeEchelle = [];
+	}
+	
+	function Sons() {
+		var objSon = document.createElement('audio');
+        objSon.setAttribute('src', 'dsgetpow.wav');
+        objSon.load();
+        this.orRamasse = objSon;
+
+		objSon = document.createElement('audio');
+        objSon.setAttribute('src', '0477.wav');
+        objSon.load();
+        this.joueurMort = objSon;
+		
+        objSon = document.createElement('audio');
+        objSon.setAttribute('src', 'Goathelm 1 (short).wav');
+        objSon.load();
+        this.ennemiEnterre = objSon;
+		
+		objSon = document.createElement('audio');
+        objSon.setAttribute('src', 'TADA.WAV');
+        objSon.load();
+        this.victoire = objSon;
+		
+		objSon = document.createElement('audio');
+		objSon.setAttribute('src','The_Howie_Long_Scream.ogg.mp3');
+		objSon.load();
+		this.ennemiMort = objSon;
+		
+		objSon = document.createElement('audio');
+		objSon.setAttribute('src','failhorn.mp3');
+		objSon.load();
+		this.gameOver = objSon;
+		
+		objSon = document.createElement('audio');
+		objSon.setAttribute('src','grass4.ogg');
+		objSon.load();
+		this.creuser = objSon;
+		
+		objSon = document.createElement('audio');
+		objSon.setAttribute('src','Pop-sound-effect.mp3');
+		objSon.load();
+		this.pop = objSon;
+		
+		objSon = document.createElement('audio');
+		objSon.setAttribute('src','Falling-sound-effect.mp3');
+		objSon.load();
+		this.chute = objSon;
+	}
+	
+	function Jeu() {
+		this.intScore = 0;
+		this.intNiveauCourant = 1;
+		this.intNbVies = 5;
+		this.tabObjFixes = new Array(intNbCasesX);
+		
+		for (var i = 0; i < this.tabObjFixes.length; i++) {
+			this.tabObjFixes[i] = new Array(intNbCasesY).fill(null);
+		}
+	}
+	
+	function Niveau() {
+		this.binDemarre = false;
+		this.intTemps = 0;
+		this.intNbGardes = objJeu.intNiveauCourant+2;
+		this.tabObjFixes = new Array(intNbCasesX);
+		
+		for (var i = 0; i < this.tabObjFixes.length; i++) {
+			this.tabObjFixes[i] = new Array(intNbCasesY).fill(null);
+		}
+	}
+	
+	function Passerelle(intXDebut, intYDebut, intLargeur, binBeton = false) {
+		this.tabObjBriques = [];
+		this.intXDebut = intXDebut * intTailleCase;
+		this.intYDebut = intYDebut * intTailleCase;
+		this.intXFin = this.intXDebut + (intLargeur * intTailleCase);
+		this.intYFin = this.intYDebut + intTailleCase;
+		
+		for (var i = this.intXDebut; i < this.intXFin; i+=32) {
+			this.tabObjBriques.push(new Brique(i,this.intYDebut,binBeton, this));
+		}
+	}
+	
+	function Brique(intXDebut, intYDebut, binBeton, objPasserelle) {
+		this.intXDebut = intXDebut;
+		this.intYDebut = intYDebut;
+		this.intXFin = this.intXDebut + intTailleCase;
+		this.intYFin = this.intYDebut + intTailleCase;
+		this.objImage = objImages.brique;
+		this.binBeton = binBeton;
+		this.binTrou = false;
+		this.intTimer = null;
+		this.objPasserelle = objPasserelle;
+		objNiveau.tabObjFixes[this.intXDebut/32][this.intYDebut/32] = this;
+	}
+	
+	function Echelle(intXDebut, intYDebut, intHauteur, binVisible = true) {
+		this.tabObjBarreaux = [];
+		this.intXDebut = intXDebut * intTailleCase;
+		this.intYDebut = intYDebut * intTailleCase;
+		this.intXFin = this.intXDebut + intTailleCase;
+		this.intYFin = this.intYDebut + (intHauteur * intTailleCase);
+		this.binVisible = binVisible;
+		
+		for (var i = this.intYDebut; i < this.intYFin; i+=32) {
+			this.tabObjBarreaux.push(new BarreauEchelle(this.intXDebut,i,this));
+		}
+	}
+	
+	function BarreauEchelle(intXDebut, intYDebut, objEchelle) {
+		this.intXDebut = intXDebut;
+		this.intYDebut = intYDebut;
+		this.intXFin = this.intXDebut + intTailleCase;
+		this.intYFin = this.intYDebut + intTailleCase;
+		this.objImage = objImages.barreauEchelle;
+		this.objEchelle = objEchelle;
+		objNiveau.tabObjFixes[this.intXDebut/32][this.intYDebut/32] = this;
+	}
+	
+	function Barre(intXDebut, intYDebut, intLargeur) {
+		this.tabObjBarreaux = [];
+		this.intXDebut = intXDebut * intTailleCase;
+		this.intYDebut = intYDebut * intTailleCase;
+		this.intXFin = this.intXDebut + (intLargeur * intTailleCase);
+		this.intYFin = this.intYDebut + intTailleCase;
+		
+		for (var i = this.intXDebut; i < this.intXFin; i+=32) {
+			this.tabObjBarreaux.push(new BarreauBarre(i,this.intYDebut));
+		}
+	}
+	
+	function BarreauBarre(intXDebut, intYDebut) {
+		this.intXDebut = intXDebut;
+		this.intYDebut = intYDebut;
+		this.intXFin = this.intXDebut + intTailleCase;
+		this.intYFin = this.intYDebut + intTailleCase;
+		this.objImage = objImages.barreauBarre;
+		objNiveau.tabObjFixes[this.intXDebut/32][this.intYDebut/32] = this;
+	}
+	
+	function Lingot(intXDebut, intYDebut) {
+		this.intXDebut = intXDebut * intTailleCase;
+		this.intYDebut = intYDebut * intTailleCase;
+		this.intXFin = this.intXDebut + intTailleCase;
+		this.intYFin = this.intYDebut + intTailleCase;
+		this.objImage = objImages.lingot;
+		objNiveau.tabObjFixes[this.intXDebut/32][this.intYDebut/32] = this;
+	}
+	
+	function Garde(intXDebut, intYDebut) {
+		this.intXDebut = intXDebut * intTailleCase;
+		this.intYDebut = intYDebut * intTailleCase;
+		this.intXFin = this.intXDebut + intTailleCase;
+		this.intYFin = this.intYDebut + intTailleCase;
+		this.tabImagesGardePasserelle = objImages.tabImagesGardePasserelle;
+		this.intIndexTabImagesGardePasserelle = 3;
+		this.tabImagesGardeBarre = objImages.tabImagesGardeBarre;
+		this.intIndexTabImagesGardeBarre = 3;
+		this.tabImagesGardeEchelle = objImages.tabImagesGardeEchelle;
+		this.intIndexTabImagesGardeEchelle = 3;
+		this.objImage = this.tabImagesGardePasserelle[this.intIndexTabImagesGardePasserelle];
+		this.intVitesse = 1;
+		this.intDirectionX = 0;
+		this.intDirectionY = 0;
+		this.binDroite = true;
+		this.tabObjLingots = [];
+	}
+	
+	function LodeRunner() {
+        this.intXDebut = (objCanvas.width/2) - (intTailleCase/2);
+		this.intYDebut = 448;
+		this.intXFin = this.intXDebut + intTailleCase;
+		this.intYFin = this.intYDebut + intTailleCase;
+		this.tabImagesLodeRunnerPasserelle = objImages.tabImagesLodeRunnerPasserelle;
+		this.intIndexTabImagesLodeRunnerPasserelle = 3;
+		this.tabImagesLodeRunnerBarre = objImages.tabImagesLodeRunnerBarre;
+		this.tabImagesLodeRunnerCreuse = objImages.tabImagesLodeRunnerCreuse;
+		this.intIndexTabImagesLodeRunnerBarre = 3;
+		this.tabImagesLodeRunnerEchelle = objImages.tabImagesLodeRunnerEchelle;
+		this.intIndexTabImagesLodeRunnerEchelle = 3;
+		this.objImage = this.tabImagesLodeRunnerPasserelle[this.intIndexTabImagesLodeRunnerPasserelle];
+        this.intVitesse = 2;
+        this.intDirectionX = 0;
+		this.intDirectionY = 0;
+		this.intDirectionCreuser = 0;
+		this.binDroite = true;
+		this.tabObjLingots = [];
+	}
+	
+	function initAnimation() {
+        objCanvas = document.getElementById('monCanvas');
+		objCanvas.focus();
+        objC2D = objCanvas.getContext('2d');
+		objNiveau = new Niveau();
+		objNiveau.binDemarre = true;
+		initObJFixes();
+		initGardes();
+		objLodeRunner = new LodeRunner();
+		dessiner();
+		animer();
+	}
+	
+	function initObJFixes() {
+		initPasserelles();
+		initEchelles();
+		initBarres();
+		initLingots();
+	}
+	
+	function initPasserelles() {
+		tabObjPasserelles = [];
+		tabObjPasserelles.push(new Passerelle(0,2,7));
+		tabObjPasserelles.push(new Passerelle(8,2,7));
+		tabObjPasserelles.push(new Passerelle(12,4,2));
+		tabObjPasserelles.push(new Passerelle(18,4,7));
+		tabObjPasserelles.push(new Passerelle(26,4,2));
+		tabObjPasserelles.push(new Passerelle(12,5,2));
+		tabObjPasserelles.push(new Passerelle(12,6,2));
+		tabObjPasserelles.push(new Passerelle(0,7,2));
+		tabObjPasserelles.push(new Passerelle(3,7,5));
+		tabObjPasserelles.push(new Passerelle(12,7,8));
+		tabObjPasserelles.push(new Passerelle(21,7,7));
+		tabObjPasserelles.push(new Passerelle(0,10,9));
+		tabObjPasserelles.push(new Passerelle(10,10,10));
+		tabObjPasserelles.push(new Passerelle(5,13,6));
+		tabObjPasserelles.push(new Passerelle(20,13,7));
+		tabObjPasserelles.push(new Passerelle(0,15,28));
+		tabObjPasserelles.push(new Passerelle(0,16,28,true));
+	}
+	
+	function initEchelles() {
+		tabObjEchelles = [];
+		tabObjEchelles.push(new Echelle(7,2,5));
+		tabObjEchelles.push(new Echelle(14,4,3));
+		tabObjEchelles.push(new Echelle(25,4,3));
+		tabObjEchelles.push(new Echelle(2,7,3));
+		tabObjEchelles.push(new Echelle(20,7,6));
+		tabObjEchelles.push(new Echelle(9,10,3));
+		tabObjEchelles.push(new Echelle(4,13,2));
+		tabObjEchelles.push(new Echelle(27,13,2));
+		tabObjEchelles.push(new Echelle(18,0,4,false));
+	}
+	
+	function initBarres() {
+		tabObjBarres = [];
+		tabObjBarres.push(new Barre(8,3,10));
+		tabObjBarres.push(new Barre(10,12,10));
+	}
+	
+	function initLingots() {
+		tabObjLingots = [];
+		tabObjLingots.push(new Lingot(4,1));
+		tabObjLingots.push(new Lingot(23,3));
+		tabObjLingots.push(new Lingot(22,6));
+		tabObjLingots.push(new Lingot(7,12));
+		tabObjLingots.push(new Lingot(24,12));
+		tabObjLingots.push(new Lingot(18,14));
+	}
+	
+	function initGardes() {
+		var tabObjFixes = objNiveau.tabObjFixes;
+		var tabEmplacementGarde = [];
+		
+		for (var x = 0; x < tabObjFixes.length; x++) {
+			for (var y = 0; y < 15; y++) {
+				if (tabObjFixes[x][y] instanceof Brique)
+					if (!tabObjFixes[x][y-1])
+						tabEmplacementGarde.push([x,y-1]);
+			}
+		}
+		
+		tabObjGardes = [];
+		
+		var tabIndex = [];
+		
+		for (var n = 0; n < tabEmplacementGarde.length; n++) {
+			tabIndex.push(n);
+		}
+		
+		var tabIndexAleatoire = tabIndex.sort(function(a, b){return 0.5 - Math.random();});
+		var indexAleatoire = null;
+		
+		for (var i = 0; i < objNiveau.intNbGardes; i++) {
+			indexAleatoire = tabIndexAleatoire.shift();
+			tabObjGardes.push(new Garde(tabEmplacementGarde[indexAleatoire][0],tabEmplacementGarde[indexAleatoire][1]));
+		}
+	}
+	
+	// Un cycle d'animation	
+	function animer() {
+		// Requête pour le prochain cycle
+		objCycleAnimation = requestAnimationFrame(animer);
+
+		// Le cycle d'animation
+		effacerDessin();
+		mettreAjourAnimation();
+		dessiner();
+	}
+
+    // Arrêter l'animation
+	function arreterAnimation() {
+		if (objCycleAnimation != null)
+			cancelAnimationFrame(objCycleAnimation);
+		objCycleAnimation = null;
+	}
+		
+	// Pour effacer le dessin
+	function effacerDessin() {
+		objC2D.clearRect(0,0, objCanvas.width, objCanvas.height); 
+	}
+		
+	// Pour mettre à jour l'animation
+	function mettreAjourAnimation() {
+		//mettreAjourAnimationGardes();
+		mettreAjourAnimationLodeRunner();
+		mettreAjourAnimationBriques();
+		if(objJeu.intNbVies===0){
+			
+			gameOver();
+			arreterAnimation();
+			objJeu.intNiveauCourant=1;
+			objJeu.intNbVies = 5;
+			objJeu.intScore = 0;
+			
+			initAnimation();
+		}
+	}
+	function mettreAjourAnimationBriques(){
+		for (var i = 0; i < objNiveau.tabObjFixes.length; i++) {
+			for (var j = 0; j < objNiveau.tabObjFixes[i].length;j++){
+					if(objNiveau.tabObjFixes[i][j] instanceof Brique){
+						if(objNiveau.tabObjFixes[i][j].binTrou === true ){
+							if(objNiveau.tabObjFixes[i][j].intTimer !==null){
+								var timer = (new Date()).getTime();
+								if(timer - objNiveau.tabObjFixes[i][j].intTimer>=8000){
+									objNiveau.tabObjFixes[i][j].binTrou = false;
+									objNiveau.tabObjFixes[i][j].intTimer = null;
+								}
+							}
+						}
+					}
+			}
+		}
+	}
+	
+	
+	
+	// Pour mettre à jour l'animation de Lode Runner
+	function mettreAjourAnimationLodeRunner() {
+		if (objNiveau.binDemarre) {
+			var binEstSurPasserelle = estSurPasserelle(objLodeRunner.intXDebut,objLodeRunner.intYDebut);
+			var binEstSurBarre = (binEstSurPasserelle) ? false : estSurBarre(objLodeRunner.intXDebut,objLodeRunner.intYDebut);
+			var binEstDansEchelle = (binEstSurPasserelle || binEstSurBarre) ? false : estDansEchelle(objLodeRunner.intXDebut,objLodeRunner.intYDebut);
+			var binEstDansVide = (binEstSurPasserelle || binEstSurBarre || binEstDansEchelle) ? false : true;
+			
+			
+			if(objLodeRunner.intDirectionCreuser!==0){
+				for(var i=0;i<2;i++){
+						objLodeRunner.objImage = objLodeRunner.tabImagesLodeRunnerCreuse[i];
+						objLodeRunner.intDirectionX=0;
+					}
+			}
+			
+			
+			
+			if (!binEstDansVide ) {
+				objSons.chute.pause();
+				objSons.chute.currentTime=0;
+				var binDeplacementPossible = null;
+				var intDeplX = objLodeRunner.intDirectionX * objLodeRunner.intVitesse;
+				var intDeplY = objLodeRunner.intDirectionY * objLodeRunner.intVitesse;
+				
+				if (objLodeRunner.intDirectionX == -1) {
+					binDeplacementPossible = deplacementGauchePermis(objLodeRunner.intXDebut,objLodeRunner.intYDebut,objLodeRunner.intVitesse);
+					if (binDeplacementPossible) {
+						objLodeRunner.intXDebut += intDeplX;
+						objLodeRunner.intXFin += intDeplX;
+					}
+				} else if (objLodeRunner.intDirectionX == 1) {
+					binDeplacementPossible = deplacementDroitePermis(objLodeRunner.intXDebut,objLodeRunner.intYDebut,objLodeRunner.intVitesse);
+					if (binDeplacementPossible) {
+						objLodeRunner.intXDebut += intDeplX;
+						objLodeRunner.intXFin += intDeplX;
+					}
+				} else if (objLodeRunner.intDirectionY == -1) {
+					binDeplacementPossible = deplacementHautPermis(objLodeRunner.intXDebut,objLodeRunner.intYDebut,objLodeRunner.intVitesse);
+					if (binDeplacementPossible == 1) {
+						objLodeRunner.intYDebut += intDeplY;
+						objLodeRunner.intYFin += intDeplY;
+					} else if (binDeplacementPossible === 0) {
+						objLodeRunner.intYDebut = Math.round(objLodeRunner.intYDebut/32)*32;
+						objLodeRunner.intYFin = objLodeRunner.intYDebut + intTailleCase;
+					} else if (objLodeRunner.intYDebut <= 2) {
+						objSons.victoire.play();
+						objJeu.intNiveauCourant++;
+						objJeu.intScore+=1500;
+						objNiveau = new Niveau();
+						initObJFixes();
+						initGardes();
+						objLodeRunner = new LodeRunner();
+					}
+				} else if (objLodeRunner.intDirectionY == 1) {
+					binDeplacementPossible = deplacementBasPermis(objLodeRunner.intXDebut,objLodeRunner.intYDebut,objLodeRunner.intVitesse);
+					if (binDeplacementPossible == 1) {
+						objLodeRunner.intYDebut += intDeplY;
+						objLodeRunner.intYFin += intDeplY;
+					} else if (binDeplacementPossible === 0) {
+						objLodeRunner.intYDebut = Math.round(objLodeRunner.intYDebut/32)*32;
+						objLodeRunner.intYFin = objLodeRunner.intYDebut + intTailleCase;
+					}
+				}
+				
+				binEstSurPasserelle = estSurPasserelle(objLodeRunner.intXDebut,objLodeRunner.intYDebut);
+				binEstSurBarre = (binEstSurPasserelle) ? false : estSurBarre(objLodeRunner.intXDebut,objLodeRunner.intYDebut);
+				binEstDansEchelle = (binEstSurPasserelle || binEstSurBarre) ? false : estDansEchelle(objLodeRunner.intXDebut,objLodeRunner.intYDebut);
+				binEstSurEchelle = (binEstDansEchelle) ? estSurEchelle(objLodeRunner.intXDebut,objLodeRunner.intYDebut) : false;
+					
+				if (binEstSurPasserelle || binEstSurEchelle) {
+					if (objLodeRunner.intDirectionX !== 0)
+						objLodeRunner.intIndexTabImagesLodeRunnerPasserelle = (objLodeRunner.intIndexTabImagesLodeRunnerPasserelle==3) ?
+																				objLodeRunner.intIndexTabImagesLodeRunnerPasserelle=0 :
+																				objLodeRunner.intIndexTabImagesLodeRunnerPasserelle+1;
+					else
+						objLodeRunner.intIndexTabImagesLodeRunnerPasserelle = 3;
+					objLodeRunner.objImage = objLodeRunner.tabImagesLodeRunnerPasserelle[objLodeRunner.intIndexTabImagesLodeRunnerPasserelle];
+				} else if(binEstDansEchelle && !binEstSurPasserelle){
+					if (objLodeRunner.intDirectionY !== 0)
+						objLodeRunner.intIndexTabImagesLodeRunnerEchelle = (objLodeRunner.intIndexTabImagesLodeRunnerEchelle==3) ?
+																			objLodeRunner.intIndexTabImagesLodeRunnerEchelle=0 :
+																			objLodeRunner.intIndexTabImagesLodeRunnerEchelle+1;
+					else
+						objLodeRunner.intIndexTabImagesLodeRunnerEchelle = 3;
+					objLodeRunner.objImage = objLodeRunner.tabImagesLodeRunnerEchelle[objLodeRunner.intIndexTabImagesLodeRunnerEchelle];
+				} else if(binEstSurBarre && !binEstSurPasserelle && !binEstDansEchelle){
+					if (objLodeRunner.intDirectionX !== 0)
+						objLodeRunner.intIndexTabImagesLodeRunnerBarre = (objLodeRunner.intIndexTabImagesLodeRunnerBarre==3) ?
+																			objLodeRunner.intIndexTabImagesLodeRunnerBarre=0 :
+																			objLodeRunner.intIndexTabImagesLodeRunnerBarre+1;
+					else
+						objLodeRunner.intIndexTabImagesLodeRunnerBarre = 3;
+					objLodeRunner.objImage = objLodeRunner.tabImagesLodeRunnerBarre[objLodeRunner.intIndexTabImagesLodeRunnerBarre];
+				}
+			} else {
+				objSons.chute.play();
+				objLodeRunner.objImage = objImages.joueurChute;
+				objLodeRunner.intYDebut += objLodeRunner.intVitesse;
+				objLodeRunner.intYFin += objLodeRunner.intVitesse;
+			}
+			
+
+			
+			// Vérifier les collisions
+			var binCollAvecLingot = estEnCollisionAvecLingot(objLodeRunner);
+			var binCollAvecGarde = lodeRunnerEstEnCollisionAvecGarde();
+			var binEstDansBrique = estEnmureVif(objLodeRunner.intXDebut,objLodeRunner.intYDebut);
+			if (binCollAvecLingot) {
+				console.log("Or!");
+				objSons.orRamasse.play();
+				objJeu.intScore+=250;
+			}
+			
+			if (binCollAvecGarde) {
+				console.log("Garde!");
+				objSons.joueurMort.play();
+				
+				objJeu.intNbVies--;	
+				objNiveau = new Niveau();
+				initObJFixes();
+				initGardes();
+				objLodeRunner = new LodeRunner();
+			}
+			if(binEstDansBrique){
+				objSons.joueurMort.play();
+				
+				objJeu.intNbVies--;	
+				objNiveau = new Niveau();
+				initObJFixes();
+				initGardes();
+				objLodeRunner = new LodeRunner();
+			}
+			
+			if (objLodeRunner.tabObjLingots.length == 6){
+				tabObjEchelles[tabObjEchelles.length-1].binVisible = true;
+			}
+		}
+	}
+	
+	function estSurPasserelle(intXDebut, intYDebut) {
+		var binEstSurPasserelle = false;
+		var intGauche = intXDebut;
+		var intDroite = intXDebut + intTailleCase;
+		var intBas = intYDebut + intTailleCase;
+		
+		var objPasserelle = null;
+		var intGauchePasserelle = null;
+		var intDroitePasserelle = null;
+		var intHautPasserelle = null;
+			
+		for (var i = 0; i < tabObjPasserelles.length && !binEstSurPasserelle; i++) {
+			objPasserelle = tabObjPasserelles[i];
+			intGauchePasserelle = objPasserelle.intXDebut;
+			intDroitePasserelle = objPasserelle.intXFin;
+			intHautPasserelle = objPasserelle.intYDebut;
+					
+			if (intBas == intHautPasserelle) {
+				if (intGauche+8 <= intDroitePasserelle &&
+					intDroite-8 >= intGauchePasserelle) {
+					var objBrique = null;
+					
+					for (var j = 0; j < objPasserelle.tabObjBriques.length && !binEstSurPasserelle; j++) {
+						objBrique = objPasserelle.tabObjBriques[j];
+						intGaucheBrique = objBrique.intXDebut;
+						intDroiteBrique = objBrique.intXFin;
+						
+						if (intGauche+8 <= intDroiteBrique &&
+							intDroite-8 >= intGaucheBrique)
+							if (!objBrique.binTrou)
+								binEstSurPasserelle = true;
+					}
+				}
+			}
+		}
+		
+		return binEstSurPasserelle;
+	}
+	
+	function estSurBarre(intXDebut, intYDebut) {
+		var binEstSurBarre = false;
+		var intGauche = intXDebut;
+		var intDroite = intXDebut + intTailleCase;
+		var intBas = intYDebut + intTailleCase;
+		
+		var objBarre = null;
+		var intGaucheBarre = null;
+		var intDroiteBarre = null;
+		var intBasBarre = null;
+			
+		for (var i = 0; i < tabObjBarres.length && !binEstSurBarre; i++) {
+			objBarre = tabObjBarres[i];
+				
+			intGaucheBarre = objBarre.intXDebut;
+			intDroiteBarre = objBarre.intXFin;
+			intBasBarre = objBarre.intYFin;
+					
+			if (intBas == intBasBarre) {
+				if (intGauche+8 <= intDroiteBarre &&
+					intDroite-8 >= intGaucheBarre) {
+							
+					binEstSurBarre = true;
+				}
+			}
+		}
+		
+		return binEstSurBarre;
+	}
+	
+		function estEnmureVif(intXDebut, intYDebut) {
+		var binEstDansBrique = false;
+		var intGauche = intXDebut;
+		var intDroite = intXDebut + intTailleCase;
+		var intBas = intYDebut + intTailleCase;
+		
+		var objBrique = null;
+		var intGaucheBrique = null;
+		var intDroiteBrique = null;
+		var intBasBrique = null;
+			
+			for (var i = 0; i < objNiveau.tabObjFixes.length; i++) {
+				for (var j = 0; j < objNiveau.tabObjFixes[i].length;j++){
+					if(objNiveau.tabObjFixes[i][j] instanceof Brique){
+						if(objNiveau.tabObjFixes[i][j].binTrou===false){
+						objBrique = objNiveau.tabObjFixes[i][j];
+							
+						intGaucheBrique = objBrique.intXDebut;
+						intDroiteBrique = objBrique.intXFin;
+						intBasBrique = objBrique.intYFin;
+						intHautBrique = objBrique.intYDebut;		
+						if (intBas == intBasBrique&&
+							intYDebut == intHautBrique){
+							if (intGauche+8 <= intDroiteBrique &&
+								intDroite-8 >= intGaucheBrique) {
+										
+								binEstDansBrique = true;
+							}
+						}
+					}
+				}
+			}
+		
+		}
+		return binEstDansBrique;
+	}
+	function estDansTrou(intXDebut, intYDebut) {
+		var binEstDansBrique = false;
+		var intGauche = intXDebut;
+		var intDroite = intXDebut + intTailleCase;
+		var intBas = intYDebut + intTailleCase;
+		
+		var objBrique = null;
+		var intGaucheBrique = null;
+		var intDroiteBrique = null;
+		var intBasBrique = null;
+			
+			for (var i = 0; i < objNiveau.tabObjFixes.length; i++) {
+				for (var j = 0; j < objNiveau.tabObjFixes[i].length;j++){
+					if(objNiveau.tabObjFixes[i][j] instanceof Brique){
+						if(objNiveau.tabObjFixes[i][j].binTrou===true){
+						objBrique = objNiveau.tabObjFixes[i][j];
+							
+						intGaucheBrique = objBrique.intXDebut;
+						intDroiteBrique = objBrique.intXFin;
+						intBasBrique = objBrique.intYFin;
+						intHautBrique = objBrique.intYDebut;		
+						if (intBas == intBasBrique&&
+							intYDebut == intHautBrique){
+							if (intGauche+8 <= intDroiteBrique &&
+								intDroite-8 >= intGaucheBrique) {
+										
+								binEstDansBrique = true;
+							}
+						}
+					}
+				}
+			}
+		
+		}
+		return binEstDansBrique;
+	}	
+	
+	
+	function estSurEchelle(intXDebut, intYDebut) {
+		var binEstSurPasserelle = false;
+		var intGauche = intXDebut;
+		var intDroite = intXDebut + intTailleCase;
+		var intBas = intYDebut + intTailleCase;
+		
+		var objEchelle = null;
+		var intGaucheEchelle = null;
+		var intDroiteEchelle = null;
+		var intHautEchelle = null;
+			
+		for (var i = 0; i < tabObjEchelles.length && !binEstSurPasserelle; i++) {
+			objEchelle = tabObjEchelles[i];
+			
+			if (objEchelle.binVisible) { 
+				intGaucheEchelle = objEchelle.intXDebut;
+				intDroiteEchelle = objEchelle.intXFin;
+				intHautEchelle = objEchelle.intYDebut;
+						
+				if (intBas == intHautEchelle)
+					if (intGauche+8 <= intDroiteEchelle &&
+						intDroite-8 >= intGaucheEchelle)
+						
+						binEstSurPasserelle = true;
+			}
+		}
+		
+		return binEstSurPasserelle;
+	}
+	
+	function estDansEchelle(intXDebut, intYDebut) {
+		var binEstSurEchelle = false;
+		var intGauche = intXDebut;
+		var intDroite = intXDebut + intTailleCase;
+		var intBas = intYDebut + intTailleCase;
+		
+		var objEchelle = null;
+		var intGaucheEchelle = null;
+		var intDroiteEchelle = null;
+		var intHautEchelle = null;
+			
+		for (var i = 0; i < tabObjEchelles.length && !binEstSurEchelle; i++) {
+			objEchelle = tabObjEchelles[i];
+			
+			if (objEchelle.binVisible) { 
+				intGaucheEchelle = objEchelle.intXDebut;
+				intDroiteEchelle = objEchelle.intXFin;
+				intHautEchelle = objEchelle.intYDebut;
+				intBasEchelle = objEchelle.intYFin;
+						
+				if (intGauche+8 <= intDroiteEchelle &&
+					intDroite-8 >= intGaucheEchelle)
+					if (intBas >= intHautEchelle &&
+						intBas <= intBasEchelle)
+						binEstSurEchelle = true;
+			}
+		}
+		return binEstSurEchelle;
+	}
+	
+	function deplacementGauchePermis(intXDebut, intYDebut, intVitesse) {
+		var binDeplacementPossible = true;
+		var intGauche = intXDebut;
+		var intHaut = intYDebut;
+		var intBas = intYDebut + intTailleCase;
+		
+		if (intGauche > 2) {
+			var objPasserelle = null;
+			
+			var intGauchePasserelle = null;
+			var intDroitePasserelle = null;
+			var intHautPasserelle = null;
+			var intBasPasserelle = null;
+			
+			for (var i = 0; i < tabObjPasserelles.length && binDeplacementPossible; i++) {
+				objPasserelle = tabObjPasserelles[i];
+				
+				intGauchePasserelle = objPasserelle.intXDebut;
+				intDroitePasserelle = objPasserelle.intXFin;
+				intHautPasserelle = objPasserelle.intYDebut;
+				intBasPasserelle = objPasserelle.intYFin;
+				
+				if (intBas > intHautPasserelle &&
+					intHaut < intBasPasserelle) {
+					if (intGauche-intVitesse <= intDroitePasserelle &&
+						intGauche-intVitesse >= intGauchePasserelle)
+						binDeplacementPossible = false;
+				}
+			}
+		} else {
+			binDeplacementPossible = false;
+		}
+		
+		return binDeplacementPossible;
+	}
+	
+	function deplacementDroitePermis(intXDebut, intYDebut, intVitesse) {
+		var binDeplacementPossible = true;
+		var intDroite = intXDebut + intTailleCase;
+		var intHaut = intYDebut;
+		var intBas = intYDebut + intTailleCase;
+		
+		if (intDroite < 894) {
+			var objPasserelle = null;
+			var intGauchePasserelle = null;
+			var intDroitePasserelle = null;
+			var intHautPasserelle = null;
+			var intBasPasserelle = null;
+			
+			for (var i = 0; i < tabObjPasserelles.length && binDeplacementPossible; i++) {
+				objPasserelle = tabObjPasserelles[i];
+				
+				intGauchePasserelle = objPasserelle.intXDebut;
+				intDroitePasserelle = objPasserelle.intXFin;
+				intHautPasserelle = objPasserelle.intYDebut;
+				intBasPasserelle = objPasserelle.intYFin;
+				
+				if (intBas > intHautPasserelle &&
+					intHaut < intBasPasserelle) {
+					if (intDroite+intVitesse >= intGauchePasserelle &&
+						intDroite+intVitesse <= intDroitePasserelle)
+						binDeplacementPossible = false;
+				}
+			}
+		} else {
+			binDeplacementPossible = false;
+		}
+		
+		return binDeplacementPossible;
+	}
+	
+	function deplacementHautPermis(intXDebut, intYDebut, intVitesse) {
+		var binDeplacementPossible = -1;
+		var intGauche = intXDebut;
+		var intDroite = intXDebut + intTailleCase;
+		var intHaut = intYDebut;
+		var intBas = intYDebut + intTailleCase;
+		
+		if (intHaut > 2) {
+			var objEchelle = null;
+			var intGaucheEchelle = null;
+			var intDroiteEchelle = null;
+			var intHautEchelle = null;
+			var intBasEchelle = null;
+			
+			for (var i = 0; i < tabObjEchelles.length && binDeplacementPossible == -1; i++) {
+				objEchelle = tabObjEchelles[i];
+				
+				if (objEchelle.binVisible) { 
+					intGaucheEchelle = objEchelle.intXDebut;
+					intDroiteEchelle = objEchelle.intXFin;
+					intHautEchelle = objEchelle.intYDebut;
+					intBasEchelle = objEchelle.intYFin;
+					
+					if (intGauche+8 >= intGaucheEchelle &&
+						intDroite-8 <= intDroiteEchelle) {
+						
+						if (intBas-intVitesse > intHautEchelle)
+							binDeplacementPossible = 1;
+						else if (intBas > intHautEchelle)
+							binDeplacementPossible = 0;
+					}
+				}
+			}
+		}
+		
+		return binDeplacementPossible;
+	}
+	
+	function deplacementBasPermis(intXDebut, intYDebut, intVitesse) {
+		var binDeplacementPossible = -1;
+		var intGauche = intXDebut;
+		var intDroite = intXDebut + intTailleCase;
+		var intBas = intYDebut + intTailleCase;
+		
+		var objEchelle = null;
+		var intGaucheEchelle = null;
+		var intDroiteEchelle = null;
+		var intHautEchelle = null;
+		var intBasEchelle = null;
+		
+		for (var i = 0; i < tabObjEchelles.length && binDeplacementPossible == -1; i++) {
+			objEchelle = tabObjEchelles[i];
+			
+			if (objEchelle.binVisible) { 
+				intGaucheEchelle = objEchelle.intXDebut;
+				intDroiteEchelle = objEchelle.intXFin;
+				intHautEchelle = objEchelle.intYDebut;
+				intBasEchelle = objEchelle.intYFin;
+				
+				if (intGauche+8 >= intGaucheEchelle &&
+					intDroite-8 <= intDroiteEchelle) {
+					
+					if (intBas+intVitesse < intBasEchelle)
+						binDeplacementPossible = 1;
+					else if (intBas < intBasEchelle)
+						binDeplacementPossible = 0;
+				}
+			}
+		}
+		
+		if(!estDansEchelle(objLodeRunner.intXDebut,objLodeRunner.intYDebut)&&!estSurEchelle(objLodeRunner.intXDebut,objLodeRunner.intYDebut)&&estSurBarre(objLodeRunner.intXDebut,objLodeRunner.intYDebut)){
+			binDeplacementPossible=1;
+		}
+		
+		return binDeplacementPossible;
+	}
+	
+	// Pour vérifier si un garde ou Lode Runner est en collision avec un lingot
+	function estEnCollisionAvecLingot(obj) {
+		var binEstEnCollision = false;
+		var intGauche = obj.intXDebut;
+		var intDroite = obj.intXFin;
+		var intHaut = obj.intYDebut;
+		var intBas = obj.intYFin;
+  
+		var objLingot = null;
+		var intGaucheLingot = null;
+		var intDroiteLingot = null;
+		var intHautLingot = null;
+		var intBasLingot = null;
+		
+		for (var i = 0; i < tabObjLingots.length && !binEstEnCollision; i++) {
+			objLingot = tabObjLingots[i];
+			intGaucheLingot = objLingot.intXDebut;
+			intDroiteLingot = objLingot.intXFin;
+			intHautLingot = objLingot.intYDebut;
+			intBasLingot = objLingot.intYFin;
+			
+			binEstEnCollision = (intBas > intHautLingot) && (intHaut < intBasLingot) && (intDroite > intGaucheLingot) && (intGauche < intDroiteLingot); 
+		}
+		
+		if (binEstEnCollision)
+			obj.tabObjLingots.push(tabObjLingots.splice(tabObjLingots.indexOf(objLingot),1));
+		
+		return binEstEnCollision;
+	}
+	
+	// Pour vérifier si Lode Runner est en collision avec un garde
+	function lodeRunnerEstEnCollisionAvecGarde() {
+		var binEstEnCollision = false;
+		var intGaucheLodeRunner = objLodeRunner.intXDebut;
+		var intDroiteLodeRunner = objLodeRunner.intXFin;
+		var intHautLodeRunner = objLodeRunner.intYDebut;
+		var intBasLodeRunner = objLodeRunner.intYFin;
+  
+		var objGarde = null;
+		var intGaucheGarde = null;
+		var intDroiteGarde = null;
+		var intHautGarde = null;
+		var intBasGarde = null;
+		
+		for (var i = 0; i < tabObjGardes.length && !binEstEnCollision; i++) {
+			objGarde = tabObjGardes[i];
+			intGaucheGarde = objGarde.intXDebut;
+			intDroiteGarde = objGarde.intXFin;
+			intHautGarde = objGarde.intYDebut;
+			intBasGarde = objGarde.intYFin;
+			
+			binEstEnCollision = (intBasLodeRunner > intHautGarde) && (intHautLodeRunner < intBasGarde) && (intDroiteLodeRunner-8 > intGaucheGarde) && (intGaucheLodeRunner+8 < intDroiteGarde);
+		}
+		
+		return binEstEnCollision;
+	}
+	
+	function dessiner(){
+		dessinerFond();
+		dessinerPasserelles();
+		dessinerEchelles();
+		dessinerBarres();
+		dessinerLingots();
+		dessinerGardes();
+		dessinerLodeRunner();
+		objC2D.strokeStyle = 'white';
+		objC2D.lineWidth = 2;
+		objC2D.font = '30px Arial';
+		objC2D.strokeText("Vies:"+objJeu.intNbVies,32,572);
+		objC2D.strokeText("Niveau:"+objJeu.intNiveauCourant,200,571);
+		objC2D.strokeText("Score:"+objJeu.intScore,400,571);
+	}
+	
+	function dessinerFond() {
+		objC2D.save();
+		objC2D.fillRect(0,0,objCanvas.width,objCanvas.height);
+		objC2D.restore();
+	}
+	
+	function gameOver(){
+	objC2D.strokeStyle = 'white';
+	objC2D.lineWidth = 2;
+	objC2D.font = '30px Arial';
+	objC2D.textAlign = "center";
+	objC2D.strokeText("Game Over",objCanvas.width/2,objCanvas.height/2);
+	objC2D.textAlign = "left";
+	objSons.gameOver.play();
+	}
+	function dessinerPasserelles() {
+		var objPasserelle = null;
+		var objBrique = null;
+		
+		for (var i = 0; i < tabObjPasserelles.length; i++) {
+			objPasserelle = tabObjPasserelles[i];
+			
+			for (var j = 0; j < objPasserelle.tabObjBriques.length; j++) {
+				objBrique = objPasserelle.tabObjBriques[j];
+				
+				objC2D.save();
+				if (objBrique.binBeton) {
+					objC2D.fillStyle = 'Gray';
+					objC2D.fillRect(objBrique.intXDebut,objBrique.intYDebut,intTailleCase,intTailleCase);
+				} else if (!objBrique.binTrou) {
+					objC2D.drawImage(objBrique.objImage,objBrique.intXDebut,objBrique.intYDebut);
+				}
+				objC2D.restore();
+			}
+		}
+	}
+	
+	function dessinerEchelles() {
+		var objEchelle = null;
+		var objBarreau = null;
+		
+		for (var i = 0; i < tabObjEchelles.length; i++) {
+			objEchelle = tabObjEchelles[i];
+			
+			if (objEchelle.binVisible) { 
+				for (var j = 0; j < objEchelle.tabObjBarreaux.length; j++) {
+					objBarreau = objEchelle.tabObjBarreaux[j];
+					
+					objC2D.save();
+					objC2D.drawImage(objBarreau.objImage,objBarreau.intXDebut,objBarreau.intYDebut);
+					objC2D.restore();
+				}
+			}
+		}
+	}
+	
+	function dessinerBarres() {
+		var objBarre = null;
+		var objBarreau = null;
+		
+		for (var i = 0; i < tabObjBarres.length; i++) {
+			objBarre = tabObjBarres[i];
+			
+			for (var j = 0; j < objBarre.tabObjBarreaux.length; j++) {
+				objBarreau = objBarre.tabObjBarreaux[j];
+				
+				objC2D.save();
+				objC2D.drawImage(objBarreau.objImage,objBarreau.intXDebut,objBarreau.intYDebut);
+				objC2D.restore();
+			}
+		}
+	}
+	
+	function dessinerLingots() {
+		var objLingot = null;
+		
+		for (var i = 0; i < tabObjLingots.length; i++) {
+			objLingot = tabObjLingots[i];
+				
+			objC2D.save();
+			objC2D.drawImage(objLingot.objImage,objLingot.intXDebut,objLingot.intYDebut);
+			objC2D.restore();
+		}
+	}
+	
+	function dessinerGardes() {
+		var objGarde = null;
+		
+		for (var i = 0; i < tabObjGardes.length; i++) {
+			objGarde = tabObjGardes[i];
+				
+			objC2D.save();
+			objC2D.drawImage(objGarde.objImage,objGarde.intXDebut,objGarde.intYDebut);
+			objC2D.restore();
+		}
+	}
+	
+	function dessinerLodeRunner() {
+        objC2D.save();
+        objC2D.translate(objLodeRunner.intXDebut, objLodeRunner.intYDebut);
+		
+		if (objLodeRunner.binDroite) {
+			objC2D.scale(-1, 1);
+			objC2D.drawImage(objLodeRunner.objImage, -intTailleCase, 0, intTailleCase, intTailleCase);
+		} else {
+			objC2D.drawImage(objLodeRunner.objImage, 0, 0, intTailleCase, intTailleCase);
+		}
+        
+		objC2D.restore();
+	}
+	
+	function demarrerNiveau() {
+		if (!objNiveau.binDemarre && event.keyCode)
+			objNiveau.binDemarre = true;
+	}
+	
+	function deplacerLodeRunner() {
+		switch (event.keyCode) {	
+		case 38: 
+			// up arrow
+			objLodeRunner.intDirectionY = -1;
+			break;
+		case 40: 
+			// down arrow
+			objLodeRunner.intDirectionY = 1;
+			break;
+		case 37: 
+		    // left arrow
+			objLodeRunner.intDirectionX = -1;
+			objLodeRunner.binDroite = false;
+		    break;
+		case 39:
+		    // right arrow
+			objLodeRunner.intDirectionX = 1;
+			objLodeRunner.binDroite = true;
+		    break;
+		}
+	}
+	
+	function creuser() {
+		var objBrique = null;
+		
+		switch (event.keyCode) {
+		case 90:
+			// z
+			objBrique = objNiveau.tabObjFixes[Math.round(objLodeRunner.intXDebut/32)-1][objLodeRunner.intYFin/32];
+			
+			if (objBrique instanceof Brique && !objBrique.binBeton && !objBrique.binTrou) {
+				objBrique.binTrou = true;
+				objBrique.intTimer = (new Date()).getTime();
+				objLodeRunner.intDirectionX = 0;
+				objLodeRunner.binDroite = false;
+				objSons.creuser.play();
+			}
+			break;
+		case 88:
+			// x
+			objBrique = objNiveau.tabObjFixes[Math.round(objLodeRunner.intXDebut/32)+1][objLodeRunner.intYFin/32];
+			
+			if (objBrique instanceof Brique && !objBrique.binBeton && !objBrique.binTrou) {
+				objBrique.binTrou = true;
+				objBrique.intTimer = (new Date()).getTime();
+				objLodeRunner.intDirectionX = 0;
+				objLodeRunner.binDroite = true;
+				objSons.creuser.play();
+			}
+			break;
+		}
+	}
+	
+	function pause(millisecondes) {
+		var start = new Date().getTime();
+		for (var i = 0; i < 1e7; i++) {
+		if ((new Date().getTime() - start) > millisecondes){
+      break;
+    }
+  }
+}
+	function arreterLodeRunner() {
+		switch (event.keyCode) {	
+		case 38: 
+			// up arrow
+			objLodeRunner.intDirectionY = 0;
+			break;
+		case 40: 
+			// down arrow
+			objLodeRunner.intDirectionY = 0;
+			break;
+		case 37: 
+			// left arrow
+			objLodeRunner.intDirectionX = 0;
+			break;
+		case 39:
+			// right arrow
+			objLodeRunner.intDirectionX = 0;
+			break;
+		}
+	}
+	
+	function arreterCreuser() {
+		switch (event.keyCode) {
+		case 90:
+			// z
+			objLodeRunner.intDirectionCreuser = 0;
+			break;
+		case 88:
+			// x
+			objLodeRunner.intDirectionCreuser = 0;
+			break;
+		}
+	}
+    </script>
+</head>
+<body onload="initAnimation();">
+	<canvas id="monCanvas" width="896" height="608" tabIndex="1" onkeydown="demarrerNiveau();deplacerLodeRunner();creuser();" onkeyup="arreterLodeRunner();arreterCreuser();">
+		Votre navigateur ne supporte pas la balise canvas
+	</canvas>
+</body>
+</html>

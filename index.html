@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Lode Runner par Marc-Antoine Lussier, Stéphanie Figuereido et Olivier Brodeur</title>
+	<link rel="stylesheet" type="text/css" href="" />
+    <script type="text/javascript" src="classes-projet01.js"></script>
+	<script type="text/javascript">
+	var objCanvas = null;
+	var objC2D = null;
+	var objCycleAnimation = null;
+
+	var intTailleCase = 32;
+
+	var objSons = new Sons();
+	var objJeu = new Jeu();
+	var objNiveau = null;
+	var tabObjPasserelles = null;
+	var tabObjEchelles = null;
+	var tabObjBarres = null;
+	var tabObjLingots = null;
+	var tabObjGardes = null;
+	var objLodeRunner = null;
+	
+	function initAnimation() {
+        objCanvas = document.getElementById('monCanvas');
+		objCanvas.focus();
+        objC2D = objCanvas.getContext('2d');
+		objNiveau = new Niveau();
+		objNiveau.binDemarre = true;
+		initObjFixes();
+		initGardes();
+		objLodeRunner = new LodeRunner();
+		dessiner();
+		animer();
+	}
+	
+	function initPasserelles() {
+		tabObjPasserelles = [];
+		tabObjPasserelles.push(new Passerelle(0,2,7));
+		tabObjPasserelles.push(new Passerelle(8,2,7));
+		tabObjPasserelles.push(new Passerelle(12,4,2));
+		tabObjPasserelles.push(new Passerelle(18,4,7));
+		tabObjPasserelles.push(new Passerelle(26,4,2));
+		tabObjPasserelles.push(new Passerelle(12,5,2));
+		tabObjPasserelles.push(new Passerelle(12,6,2));
+		tabObjPasserelles.push(new Passerelle(0,7,2));
+		tabObjPasserelles.push(new Passerelle(3,7,5));
+		tabObjPasserelles.push(new Passerelle(12,7,8));
+		tabObjPasserelles.push(new Passerelle(21,7,7));
+		tabObjPasserelles.push(new Passerelle(0,10,9));
+		tabObjPasserelles.push(new Passerelle(10,10,10));
+		tabObjPasserelles.push(new Passerelle(5,13,6));
+		tabObjPasserelles.push(new Passerelle(20,13,7));
+		tabObjPasserelles.push(new Passerelle(0,15,28));
+		tabObjPasserelles.push(new Passerelle(0,16,28,true));
+	}
+	
+	function initEchelles() {
+		tabObjEchelles = [];
+		tabObjEchelles.push(new Echelle(7,2,5));
+		tabObjEchelles.push(new Echelle(14,4,3));
+		tabObjEchelles.push(new Echelle(25,4,3));
+		tabObjEchelles.push(new Echelle(2,7,3));
+		tabObjEchelles.push(new Echelle(20,7,6));
+		tabObjEchelles.push(new Echelle(9,10,3));
+		tabObjEchelles.push(new Echelle(4,13,2));
+		tabObjEchelles.push(new Echelle(27,13,2));
+		tabObjEchelles.push(new Echelle(18,0,4,false));
+	}
+	
+	function initBarres() {
+		tabObjBarres = [];
+		tabObjBarres.push(new Barre(8,3,10));
+		tabObjBarres.push(new Barre(10,12,10));
+	}
+	
+	function initLingots() {
+		tabObjLingots = [];
+		tabObjLingots.push(new Lingot(4,1));
+		tabObjLingots.push(new Lingot(23,3));
+		tabObjLingots.push(new Lingot(22,6));
+		tabObjLingots.push(new Lingot(7,12));
+		tabObjLingots.push(new Lingot(24,12));
+		tabObjLingots.push(new Lingot(18,14));
+	}
+	
+	function initObjFixes() {
+		initPasserelles();
+		initEchelles();
+		initBarres();
+		initLingots();
+	}
+	
+	function initGardes() {
+		var tabObjFixes = objNiveau.tabObjFixes;
+		var tabEmplacementGarde = [];
+		
+		for (var x = 0; x < tabObjFixes.length; x++) {
+			for (var y = 0; y < 15; y++) {
+				if (tabObjFixes[x][y] instanceof Brique)
+					if (!tabObjFixes[x][y-1])
+						tabEmplacementGarde.push([x,y-1]);
+			}
+		}
+		
+		tabObjGardes = [];
+		
+		var tabIndex = [];
+		
+		for (var n = 0; n < tabEmplacementGarde.length; n++) {
+			tabIndex.push(n);
+		}
+		
+		var tabIndexAleatoire = tabIndex.sort(function(){return 0.5 - Math.random();});
+		var indexAleatoire = null;
+		
+		for (var i = 0; i < objNiveau.intNbGardes; i++) {
+			indexAleatoire = tabIndexAleatoire.shift();
+			tabObjGardes.push(new Garde(tabEmplacementGarde[indexAleatoire][0],tabEmplacementGarde[indexAleatoire][1]));
+		}
+	}
+	
+	// Un cycle d'animation	
+	function animer() {
+		// Requête pour le prochain cycle
+		objCycleAnimation = requestAnimationFrame(animer);
+
+		// Le cycle d'animation
+		effacerDessin();
+		mettreAjourAnimation();
+		dessiner();
+	}
+
+    // Arrêter l'animation
+	function arreterAnimation() {
+		if (objCycleAnimation !== null)
+			cancelAnimationFrame(objCycleAnimation);
+		objCycleAnimation = null;
+	}
+		
+	// Pour effacer le dessin
+	function effacerDessin() {
+		objC2D.clearRect(0,0, objCanvas.width, objCanvas.height); 
+	}
+		
+	// Pour mettre à jour l'animation
+	function mettreAjourAnimation() {
+		mettreAjourAnimationGardes();
+		mettreAjourAnimationLodeRunner();
+		mettreAjourAnimationBriques();
+	}
+	
+	// Pour mettre à jour l'animation des gardes
+	function mettreAjourAnimationGardes() {
+		if (objNiveau.binDemarre) {
+			var objGarde = null;
+			var binEstSurPasserelle = null;
+			var binEstSurBarre = null;
+			var binEstDansEchelle = null;
+			var binEstSurEchelle = null;
+			var binEstDansVide = null;
+			var binEstDansPasserelle = null;
+			
+			for (var i = 0; i < tabObjGardes.length; i++) {
+				objGarde = tabObjGardes[i];
+				
+				binEstSurPasserelle = objGarde.estSurPasserelle();
+				binEstDansEchelle = objGarde.estDansEchelle();
+				binEstSurEchelle = (binEstDansEchelle) ? objGarde.estSurEchelle() : false;
+				binEstSurBarre = (binEstSurPasserelle || binEstDansEchelle) ? false : objGarde.estSurBarre();
+				binEstDansVide = (binEstSurPasserelle || binEstSurBarre || binEstDansEchelle) ? false : true;
+				binEstDansPasserelle = (binEstDansVide) ? objGarde.estDansPasserelle() : false;
+				
+				if (binEstDansVide) {
+					 if (binEstDansPasserelle) {
+						var objBrique = objNiveau.tabObjFixes[Math.round(objGarde.intXDebut/32)][Math.round(objGarde.intYDebut/32)];
+						
+						if (!objBrique.objPrisonnier) {
+							objBrique.objPrisonnier = objGarde;
+							objBrique.tempsPrisonnier = (new Date()).getTime();
+						}
+						else{
+							if(objGarde.tabObjLingots.length>0){
+								objGarde.tabObjLingots.splice(objGarde.tabObjLingots.length-1,1);
+								tabObjLingots.push(new Lingot((Math.round(objGarde.intXDebut/32)),(Math.round((objGarde.intYDebut)/32)-1)));
+							}
+						}
+					} else {
+						//objSons.chute.play();
+						objGarde.objImage = objGarde.ennemiChute;
+						objGarde.intYDebut += objGarde.intVitesse;
+						objGarde.intYFin += objGarde.intVitesse;
+					}
+				} else {
+					//objSons.chute.pause();
+					//objSons.chute.currentTime = 0;
+					var binDeplacementPossible = null;
+					
+					if (binEstDansEchelle) {
+						if (objGarde.intYFin < objLodeRunner.intYFin) {
+							binDeplacementPossible = objGarde.deplacementBasPermis();
+							if (binDeplacementPossible == 1) {
+								objGarde.intYDebut += objGarde.intVitesse;
+								objGarde.intYFin += objGarde.intVitesse;
+							} else if (binDeplacementPossible === 0) {
+								objGarde.intYDebut = Math.round(objGarde.intYDebut/32)*32;
+								objGarde.intYFin = objGarde.intYDebut + intTailleCase;
+							}
+						} else if (objGarde.intYFin > objLodeRunner.intYFin) {
+							binDeplacementPossible = objGarde.deplacementHautPermis();
+							if (binDeplacementPossible == 1) {
+								objGarde.intYDebut -= objGarde.intVitesse;
+								objGarde.intYFin -= objGarde.intVitesse;
+							} else if (binDeplacementPossible === 0) {
+								objGarde.intYDebut = Math.round(objGarde.intYDebut/32)*32;
+								objGarde.intYFin = objGarde.intYDebut + intTailleCase;
+							}
+						} else {					
+							if (objGarde.intXFin < objLodeRunner.intXFin)
+								objGarde.intDirectionX = 1;
+							else if (objGarde.intXFin > objLodeRunner.intXFin)
+								objGarde.intDirectionX = -1;
+						}
+					}
+					
+					if (!binDeplacementPossible || binDeplacementPossible == -1) {
+						if (objGarde.intDirectionX == 1) {
+							binDeplacementPossible = objGarde.deplacementDroitePermis();
+							if (binDeplacementPossible) {
+								objGarde.intXDebut += objGarde.intVitesse;
+								objGarde.intXFin += objGarde.intVitesse;
+								objGarde.binDroite = true;
+							} else {
+								objGarde.intDirectionX = -1;
+							}
+						} else if (objGarde.intDirectionX == -1) {
+							binDeplacementPossible = objGarde.deplacementGauchePermis();
+							if (binDeplacementPossible) {
+								objGarde.intXDebut -= objGarde.intVitesse;
+								objGarde.intXFin -= objGarde.intVitesse;
+								objGarde.binDroite = false;
+							} else {
+								objGarde.intDirectionX = 1;
+							}
+							
+							
+							
+						}
+						
+						
+						
+					}
+					
+					binEstSurPasserelle = (objGarde.estSurBarre()) ? false : objGarde.estSurPasserelle();
+					binEstDansEchelle = objGarde.estDansEchelle();
+					binEstSurEchelle = (binEstDansEchelle) ? objGarde.estSurEchelle() : false;
+					binEstSurBarre = (binEstSurPasserelle || binEstDansEchelle) ? false : objGarde.estSurBarre();
+						
+					if (binEstSurPasserelle || binEstSurEchelle) {
+						objGarde.intIndexTabImagesPasserelle = (objGarde.intIndexTabImagesPasserelle==3) ?
+																objGarde.intIndexTabImagesPasserelle=0 :
+																objGarde.intIndexTabImagesPasserelle+1;
+						objGarde.objImage = objGarde.tabImagesPasserelle[objGarde.intIndexTabImagesPasserelle];
+						
+						
+						
+					} else if(binEstDansEchelle && !binEstSurPasserelle) {
+						objGarde.intIndexTabImagesEchelle = (objGarde.intIndexTabImagesEchelle==3) ?
+															objGarde.intIndexTabImagesEchelle=0 :
+															objGarde.intIndexTabImagesEchelle+1;
+						objGarde.objImage = objGarde.tabImagesEchelle[objGarde.intIndexTabImagesEchelle];
+					} else if(binEstSurBarre && !binEstSurPasserelle && !binEstDansEchelle) {
+						objGarde.intIndexTabImagesBarre = (objGarde.intIndexTabImagesBarre==3) ?
+															objGarde.intIndexTabImagesBarre=0 :
+															objGarde.intIndexTabImagesBarre+1;
+						objGarde.objImage = objGarde.tabImagesBarre[objGarde.intIndexTabImagesBarre];
+					}
+					
+					//timer or
+					if(binEstSurPasserelle&&!binEstSurEchelle&&!binEstDansEchelle&&!binEstSurBarre){
+							var timerAleatoire = Math.floor((Math.random() * 2000) + 0);
+							if((objGarde.timerDropOr!==null)&&(objGarde.tabObjLingots.length>0)&&((new Date()).getTime()-objGarde.timerDropOr>=5000+timerAleatoire)){
+								
+								
+								if(objGarde.intDirectionX==1){
+									if((objGarde.intXFin>32)&&(!objNiveau.tabObjFixes[Math.round(objGarde.intXDebut/32)-1][Math.round((objGarde.intYDebut)/32)]))	{
+									objGarde.tabObjLingots.splice(objGarde.tabObjLingots.length-1,1);
+									tabObjLingots.push(new Lingot((Math.round(objGarde.intXDebut/32)-1),(Math.round((objGarde.intYDebut)/32))));
+									}
+								}
+								else if(objGarde.intDirectionX==-1){
+									if((objGarde.intXFin<864)&&(!objNiveau.tabObjFixes[Math.round(objGarde.intXDebut/32)+1][Math.round((objGarde.intYDebut)/32)])){
+									objGarde.tabObjLingots.splice(objGarde.tabObjLingots.length-1,1);
+									tabObjLingots.push(new Lingot((Math.round(objGarde.intXDebut/32)+1),(Math.round((objGarde.intYDebut)/32))));
+								}
+							}
+						}
+					}
+				}
+				
+				// Vérifier les collisions
+				if(objGarde.tabObjLingots.length===0){
+				var binCollAvecLingot = objGarde.estEnCollisionAvecLingot();
+				
+				
+				if (binCollAvecLingot){
+					
+					//objSons.orRamasse.play();
+					objGarde.timerDropOr = (new Date()).getTime();
+					var objOr = objGarde.tabObjLingots[objGarde.tabObjLingots.length-1];
+					objNiveau.tabObjFixes[objOr[objOr.length-1].intXDebut/32][objOr[objOr.length-1].intYDebut/32]=null;
+					
+					}
+				}
+					if((objNiveau.tabObjFixes[Math.round(objGarde.intXDebut/32)][Math.round(objGarde.intYDebut/32)] instanceof Brique)&&
+				(objNiveau.tabObjFixes[Math.round(objGarde.intXDebut/32)][Math.round(objGarde.intYDebut/32)].binTrou===false)){
+					
+					
+					objSons.ennemiMort.play();
+					objNiveau.intScore+=75;
+					var intXOrif=Math.round(objGarde.intXDebut/32);
+					var intYOrIf = Math.round((objGarde.intYDebut-32)/32);
+					tabObjGardes.splice(tabObjGardes.indexOf(objGarde),1);
+					
+					if(objGarde.tabObjLingots.length > 0){
+							objGarde.tabObjLingots.splice(objGarde.tabObjLingots.length-1,1);
+							tabObjLingots.push(new Lingot(intXOrif,intYOrIf));
+							
+						}
+					tabObjGardes.push(new Garde(Math.floor((Math.random() * 10)),1));
+					
+				}
+			}
+		}
+	}
+	
+	// Pour mettre à jour l'animation de Lode Runner
+	function mettreAjourAnimationLodeRunner() {
+		if (objNiveau.binDemarre) {
+			var binEstSurPasserelle = objLodeRunner.estSurPasserelle();
+			var binEstSurBarre = (binEstSurPasserelle) ? false : objLodeRunner.estSurBarre();
+			var binEstDansEchelle = (binEstSurPasserelle || binEstSurBarre) ? false : objLodeRunner.estDansEchelle();
+			var binEstSurEchelle = null;
+			var binEstDansVide = (binEstSurPasserelle || binEstSurBarre || binEstDansEchelle) ? false : true;
+			if(objLodeRunner.intDirectionCreuser!==0){
+				for(var i=0;i<2;i++){
+						objLodeRunner.objImage = objLodeRunner.tabImagesLodeRunnerCreuse[i];
+						objLodeRunner.intDirectionX=0;
+					}
+			}
+			
+			else if (!binEstDansVide) {
+				objSons.chute.pause();
+				objSons.chute.currentTime = 0;
+				var binDeplacementPossible = null;
+				var intDeplX = objLodeRunner.intDirectionX * objLodeRunner.intVitesse;
+				var intDeplY = objLodeRunner.intDirectionY * objLodeRunner.intVitesse;
+				
+				if (objLodeRunner.intDirectionX == -1) {
+					binDeplacementPossible = objLodeRunner.deplacementGauchePermis();
+					if (binDeplacementPossible) {
+						objLodeRunner.intXDebut += intDeplX;
+						objLodeRunner.intXFin += intDeplX;
+					}
+				} else if (objLodeRunner.intDirectionX == 1) {
+					binDeplacementPossible = objLodeRunner.deplacementDroitePermis();
+					if (binDeplacementPossible) {
+						objLodeRunner.intXDebut += intDeplX;
+						objLodeRunner.intXFin += intDeplX;
+					}
+				} else if (objLodeRunner.intDirectionY == -1) {
+					binDeplacementPossible = objLodeRunner.deplacementHautPermis();
+					if (binDeplacementPossible == 1) {
+						objLodeRunner.intYDebut += intDeplY;
+						objLodeRunner.intYFin += intDeplY;
+					} else if (binDeplacementPossible === 0) {
+						objLodeRunner.intYDebut = Math.round(objLodeRunner.intYDebut/32)*32;
+						objLodeRunner.intYFin = objLodeRunner.intYDebut + intTailleCase;
+					} else if (objLodeRunner.intYDebut <= 2) {
+						objSons.victoire.play();
+						objJeu.intNiveauCourant++;	
+						objNiveau = new Niveau();
+						initObjFixes();
+						
+						initGardes();
+						objLodeRunner = new LodeRunner();
+					}
+				} else if (objLodeRunner.intDirectionY == 1) {
+					binDeplacementPossible = objLodeRunner.deplacementBasPermis();
+					if (binDeplacementPossible == 1) {
+						objLodeRunner.intYDebut += intDeplY;
+						objLodeRunner.intYFin += intDeplY;
+					} else if (binDeplacementPossible === 0) {
+						objLodeRunner.intYDebut = Math.round(objLodeRunner.intYDebut/32)*32;
+						objLodeRunner.intYFin = objLodeRunner.intYDebut + intTailleCase;
+					}
+				}
+				
+				binEstSurPasserelle = objLodeRunner.estSurPasserelle();
+				binEstDansEchelle = objLodeRunner.estDansEchelle();
+				binEstSurEchelle = (binEstDansEchelle) ? objLodeRunner.estSurEchelle() : false;
+				binEstSurBarre = (binEstSurPasserelle || binEstDansEchelle) ? false : objLodeRunner.estSurBarre();
+					
+				if (binEstSurPasserelle || binEstSurEchelle) {
+					if (objLodeRunner.intDirectionX !== 0)
+						objLodeRunner.intIndexTabImagesPasserelle = (objLodeRunner.intIndexTabImagesPasserelle==3) ?
+																	objLodeRunner.intIndexTabImagesPasserelle=0 :
+																	objLodeRunner.intIndexTabImagesPasserelle+1;
+					else
+						objLodeRunner.intIndexTabImagesPasserelle = 3;
+					objLodeRunner.objImage = objLodeRunner.tabImagesPasserelle[objLodeRunner.intIndexTabImagesPasserelle];
+				} else if(binEstDansEchelle && !binEstSurPasserelle) {
+					if (objLodeRunner.intDirectionY !== 0)
+						objLodeRunner.intIndexTabImagesEchelle = (objLodeRunner.intIndexTabImagesEchelle==3) ?
+																	objLodeRunner.intIndexTabImagesEchelle=0 :
+																	objLodeRunner.intIndexTabImagesEchelle+1;
+					else
+						objLodeRunner.intIndexTabImagesEchelle = 3;
+					objLodeRunner.objImage = objLodeRunner.tabImagesEchelle[objLodeRunner.intIndexTabImagesEchelle];
+				} else if(binEstSurBarre && !binEstSurPasserelle && !binEstDansEchelle) {
+					if (objLodeRunner.intDirectionX !== 0)
+						objLodeRunner.intIndexTabImagesBarre = (objLodeRunner.intIndexTabImagesBarre==3) ?
+																objLodeRunner.intIndexTabImagesBarre=0 :
+																objLodeRunner.intIndexTabImagesBarre+1;
+					else
+						objLodeRunner.intIndexTabImagesBarre = 3;
+					objLodeRunner.objImage = objLodeRunner.tabImagesBarre[objLodeRunner.intIndexTabImagesBarre];
+				}
+			} else {
+				objSons.chute.play();
+				objLodeRunner.objImage = objLodeRunner.joueurChute;
+				objLodeRunner.intYDebut += objLodeRunner.intVitesse;
+				objLodeRunner.intYFin += objLodeRunner.intVitesse;
+			}
+			
+			// Vérifier les collisions
+			var binCollAvecLingot = objLodeRunner.estEnCollisionAvecLingot();
+			var binCollAvecGarde = objLodeRunner.estEnCollisionAvecGarde();
+			
+			if (binCollAvecLingot) {
+				objSons.orRamasse.play();
+				objJeu.intScore += 250;
+				var objOr = objLodeRunner.tabObjLingots[objLodeRunner.tabObjLingots.length-1];
+				objNiveau.tabObjFixes[objOr[objOr.length-1].intXDebut/32][objOr[objOr.length-1].intYDebut/32]=null;
+			}
+			
+			
+			
+			
+			if (binCollAvecGarde) {
+				objJeu.intNbVies--;	
+				
+				if (objJeu.partieTermine()) {
+					arreterAnimation();
+					objSons.gameOver.play();
+					dessinerFinPartie();
+				} else {
+					objSons.joueurMort.play();
+					
+					objNiveau = new Niveau();
+					initObjFixes();
+					initGardes();
+					objLodeRunner = new LodeRunner();
+				}
+			}
+			
+			if (objLodeRunner.tabObjLingots.length == 6)
+				tabObjEchelles[tabObjEchelles.length-1].binVisible = true;
+				
+			
+			if((objNiveau.tabObjFixes[Math.round(objLodeRunner.intXDebut/32)][Math.round(objLodeRunner.intYDebut/32)] instanceof Brique)&&
+			   (objNiveau.tabObjFixes[Math.round(objLodeRunner.intXDebut/32)][Math.round(objLodeRunner.intYDebut/32)].binTrou===false)){
+				objJeu.intNbVies--;	
+				
+				if (objJeu.partieTermine()) {
+					arreterAnimation();
+					objSons.gameOver.play();
+					dessinerFinPartie();
+				} else {
+					objSons.joueurMort.play();
+					
+					objNiveau = new Niveau();
+					initObjFixes();
+					initGardes();
+					objLodeRunner = new LodeRunner();
+				}
+				
+			}
+		}
+	}
+	
+	function mettreAjourAnimationBriques() {
+		var objBrique = null;
+		
+		for (var i = 0; i < objNiveau.tabObjFixes.length; i++) {
+			for (var j = 0; j < objNiveau.tabObjFixes[i].length; j++) {
+				objBrique = objNiveau.tabObjFixes[i][j];
+				
+				if (objBrique instanceof Brique) {
+					var tempsPresent = null;
+					
+					if (objBrique.binTrou) {
+						tempsPresent = (new Date()).getTime();
+						
+						if (tempsPresent - objBrique.tempsTrou >= 8000) {
+							objBrique.binTrou = false;
+							objBrique.tempsTrou = null;
+							objSons.pop.play(); 
+						}
+					}
+					
+					if (objBrique.objPrisonnier) {
+						
+						if(objBrique.objPrisonnier.pourPasJouerSonEnLoop===false){
+						objSons.ennemiEnterre.play();
+						//console.log("Piégé");
+						objNiveau.intScore+=75;
+						objBrique.objPrisonnier.pourPasJouerSonEnLoop=true;
+						}
+						tempsPresent = (new Date()).getTime();
+						if(objBrique.objPrisonnier.tabObjLingots.length > 0){
+							objBrique.objPrisonnier.tabObjLingots.splice(objBrique.objPrisonnier.tabObjLingots.length-1,1);
+							tabObjLingots.push(new Lingot((Math.round(objBrique.objPrisonnier.intXDebut/32)),(Math.round((objBrique.objPrisonnier.intYDebut-32)/32))));
+							
+						}
+						if (tempsPresent - objBrique.tempsPrisonnier >= 4000) {
+							var objGarde = objBrique.objPrisonnier;
+							
+							if (objBrique.binTrou) {
+								if (objGarde.intDirectionX == 1) {
+									objGarde.intXDebut = objGarde.intXDebut + intTailleCase;
+									objGarde.intYDebut = Math.round((objGarde.intYDebut-intTailleCase)/32)*32;
+									objGarde.intXFin = objGarde.intXDebut + intTailleCase;
+									objGarde.intYFin = objGarde.intYDebut + intTailleCase;
+								} else if (objGarde.intDirectionX == -1) {
+									objGarde.intXDebut = objGarde.intXDebut - intTailleCase;
+									objGarde.intYDebut = Math.round((objGarde.intYDebut-intTailleCase)/32)*32;
+									objGarde.intXFin = objGarde.intXDebut + intTailleCase;
+									objGarde.intYFin = objGarde.intYDebut + intTailleCase;
+								}
+							} 
+							objGarde.pourPasJouerSonEnLoop=false;
+							objBrique.objPrisonnier = null;
+							objBrique.tempsPrisonnier = null;
+						}
+					}
+				}
+			}
+		}
+	}
+	
+	function dessiner(){
+		dessinerFond();
+		dessinerPasserelles();
+		dessinerEchelles();
+		dessinerBarres();
+		dessinerLingots();
+		dessinerGardes();
+		dessinerLodeRunner();
+		dessinerHUD();
+	}
+	
+	function dessinerFond() {
+		objC2D.save();
+		objC2D.fillRect(0,0,objCanvas.width,objCanvas.height);
+		objC2D.restore();
+	}
+	function dessinerHUD(){
+		objC2D.strokeStyle = 'white';
+		objC2D.lineWidth = 2;
+		objC2D.font = '30px Arial';
+		objC2D.strokeText("Vies:"+objJeu.intNbVies,32,572);
+		objC2D.strokeText("Niveau:"+objJeu.intNiveauCourant,200,571);
+		objC2D.strokeText("Score:"+objJeu.intScore,400,571);
+	}
+	function dessinerPasserelles() {
+		var objPasserelle = null;
+		var objBrique = null;
+		
+		for (var i = 0; i < tabObjPasserelles.length; i++) {
+			objPasserelle = tabObjPasserelles[i];
+			
+			for (var j = 0; j < objPasserelle.tabObjBriques.length; j++) {
+				objBrique = objPasserelle.tabObjBriques[j];
+				
+				objC2D.save();
+				if (objBrique.binBeton) {
+					objC2D.drawImage(objBrique.objImage2,objBrique.intXDebut,objBrique.intYDebut);
+				} else if (!objBrique.binTrou) {
+					objC2D.drawImage(objBrique.objImage,objBrique.intXDebut,objBrique.intYDebut);
+				}
+				objC2D.restore();
+			}
+		}
+	}
+	
+	function dessinerEchelles() {
+		var objEchelle = null;
+		var objBarreau = null;
+		
+		for (var i = 0; i < tabObjEchelles.length; i++) {
+			objEchelle = tabObjEchelles[i];
+			
+			if (objEchelle.binVisible) { 
+				for (var j = 0; j < objEchelle.tabObjBarreaux.length; j++) {
+					objBarreau = objEchelle.tabObjBarreaux[j];
+					
+					objC2D.save();
+					objC2D.drawImage(objBarreau.objImage,objBarreau.intXDebut,objBarreau.intYDebut);
+					objC2D.restore();
+				}
+			}
+		}
+	}
+	
+	function dessinerBarres() {
+		var objBarre = null;
+		var objBarreau = null;
+		
+		for (var i = 0; i < tabObjBarres.length; i++) {
+			objBarre = tabObjBarres[i];
+			
+			for (var j = 0; j < objBarre.tabObjBarreaux.length; j++) {
+				objBarreau = objBarre.tabObjBarreaux[j];
+				
+				objC2D.save();
+				objC2D.drawImage(objBarreau.objImage,objBarreau.intXDebut,objBarreau.intYDebut);
+				objC2D.restore();
+			}
+		}
+	}
+	
+	function dessinerLingots() {
+		var objLingot = null;
+		
+		for (var i = 0; i < tabObjLingots.length; i++) {
+			objLingot = tabObjLingots[i];
+				
+			objC2D.save();
+			objC2D.drawImage(objLingot.objImage,objLingot.intXDebut,objLingot.intYDebut);
+			objC2D.restore();
+		}
+	}
+	
+	function dessinerGardes() {
+		var objGarde = null;
+		
+		for (var i = 0; i < tabObjGardes.length; i++) {
+			objGarde = tabObjGardes[i];
+				
+			objC2D.save();
+			objC2D.translate(objGarde.intXDebut, objGarde.intYDebut);
+			
+			if (objGarde.binDroite) {
+				objC2D.scale(-1, 1);
+				objC2D.drawImage(objGarde.objImage, -intTailleCase, 0, intTailleCase, intTailleCase);
+				if(objGarde.tabObjLingots.length>0){
+				objC2D.strokeStyle = 'gold';
+				objC2D.beginPath();
+				objC2D.arc(-16, 16, 10, 0, Math.PI * 2, true);
+				objC2D.stroke();
+				objC2D.closePath();
+				objC2D.strokeStyle = 'white';
+			}
+			} else {
+				objC2D.drawImage(objGarde.objImage, 0, 0, intTailleCase, intTailleCase);
+				if(objGarde.tabObjLingots.length>0){
+				objC2D.strokeStyle = 'gold';
+				objC2D.beginPath();
+				objC2D.arc(16, 16, 10, 0, Math.PI * 2, true);
+				objC2D.stroke();
+				objC2D.closePath();
+				objC2D.strokeStyle = 'white';
+			}
+			}
+			
+			
+			
+			objC2D.restore();
+		}
+	}
+	
+	function dessinerLodeRunner() {
+        objC2D.save();
+        objC2D.translate(objLodeRunner.intXDebut, objLodeRunner.intYDebut);
+		
+		if (objLodeRunner.binDroite) {
+			objC2D.scale(-1, 1);
+			objC2D.drawImage(objLodeRunner.objImage, -intTailleCase, 0, intTailleCase, intTailleCase);
+		} else {
+			objC2D.drawImage(objLodeRunner.objImage, 0, 0, intTailleCase, intTailleCase);
+		}
+        
+		objC2D.restore();
+	}
+	
+	function dessinerFinPartie() {
+		objC2D.save();
+		objC2D.strokeStyle = 'white';
+		objC2D.lineWidth = 2;
+		objC2D.font = '30px Arial';
+		objC2D.textAlign = "center";
+		objC2D.strokeText("Game Over",objCanvas.width/2,objCanvas.height/2);
+		objC2D.restore();
+	}
+	
+	function demarrerNouvellePartie() {
+		if ((objJeu.partieTermine() || objJeu.partieGagne()) && event.keyCode)
+			location.reload();
+	}
+	
+	function demarrerNiveau() {
+		if (!objNiveau.binDemarre && event.keyCode)
+			objNiveau.binDemarre = true;
+	}
+	
+	function deplacerLodeRunner() {
+		switch (event.keyCode) {	
+		case 38: 
+			// up arrow
+			objLodeRunner.intDirectionY = -1;
+			break;
+		case 40: 
+			// down arrow
+			objLodeRunner.intDirectionY = 1;
+			break;
+		case 37: 
+		    // left arrow
+			objLodeRunner.intDirectionX = -1;
+			objLodeRunner.binDroite = false;
+		    break;
+		case 39:
+		    // right arrow
+			objLodeRunner.intDirectionX = 1;
+			objLodeRunner.binDroite = true;
+		    break;
+		}
+	}
+	
+	function creuser() {
+		var objBrique = null;
+		
+		switch (event.keyCode) {
+		case 90:
+			// z
+			objBrique = objNiveau.tabObjFixes[Math.round(objLodeRunner.intXDebut/32)-1][Math.round(objLodeRunner.intYFin/32)];
+			console.log(objNiveau.tabObjFixes[Math.round(objLodeRunner.intXDebut/32)-1][Math.round(objLodeRunner.intYFin/32)]-1);
+			if(!objNiveau.tabObjFixes[Math.round(objLodeRunner.intXDebut/32)-1][Math.round(objLodeRunner.intYFin/32)-1])
+			if (objBrique instanceof Brique && !objBrique.binBeton && !objBrique.binTrou) {
+				objLodeRunner.intDirectionCreuser=1;
+				objBrique.binTrou = true;
+				objBrique.tempsTrou = (new Date()).getTime();
+				objLodeRunner.intDirectionX = 0;
+				objLodeRunner.binDroite = false;
+				objSons.creuser.play();
+			}
+			break;
+		case 88:
+			// x
+			objBrique = objNiveau.tabObjFixes[Math.round(objLodeRunner.intXDebut/32)+1][Math.round(objLodeRunner.intYFin/32)];
+			console.log(objNiveau.tabObjFixes[Math.round(objLodeRunner.intXDebut/32)+1][Math.round(objLodeRunner.intYFin/32)-1]);
+			if(!objNiveau.tabObjFixes[Math.round(objLodeRunner.intXDebut/32)+1][Math.round(objLodeRunner.intYFin/32)-1])
+			if (objBrique instanceof Brique && !objBrique.binBeton && !objBrique.binTrou) {
+				objLodeRunner.intDirectionCreuser=1;
+				objBrique.binTrou = true;
+				objBrique.tempsTrou = (new Date()).getTime();
+				objLodeRunner.intDirectionX = 0;
+				objLodeRunner.binDroite = true;
+				objSons.creuser.play();
+			}
+			break;
+		}
+	}
+	
+	function arreterLodeRunner() {
+		switch (event.keyCode) {
+		case 38: 
+			// up arrow
+			objLodeRunner.intDirectionY = 0;
+			break;
+		case 40: 
+			// down arrow
+			objLodeRunner.intDirectionY = 0;
+			break;
+		case 37: 
+			// left arrow
+			objLodeRunner.intDirectionX = 0;
+			break;
+		case 39:
+			// right arrow
+			objLodeRunner.intDirectionX = 0;
+			break;
+		}
+	}
+	
+	function arreterCreuser() {
+		switch (event.keyCode) {
+		case 90:
+			// z
+			objLodeRunner.intDirectionCreuser = 0;
+			break;
+		case 88:
+			// x
+			objLodeRunner.intDirectionCreuser = 0;
+			break;
+		}
+	}
+	
+	/*function pause(intNbMillisecondes) {
+		var intDebut = new Date().getTime();
+		while ((new Date().getTime() - intDebut) < intNbMillisecondes) {}
+    }*/
+    </script>
+</head>
+<body onload="initAnimation();">
+	<canvas id="monCanvas" width="896" height="608" tabIndex="1" onkeydown="demarrerNouvellePartie();demarrerNiveau();deplacerLodeRunner();creuser();" onkeyup="arreterLodeRunner();arreterCreuser();">
+		Votre navigateur ne supporte pas la balise canvas
+	</canvas>
+</body>
+</html>
